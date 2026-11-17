@@ -72,6 +72,8 @@ textarea.input{min-height:120px;resize:vertical}
 .slot input:focus-visible+span{outline:2px solid var(--gold);outline-offset:2px}
 .slot input:disabled+span{opacity:.35;text-decoration:line-through}
 .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.hp input{width:1px;height:1px;padding:0;border:0}
+.tap{display:inline-flex;align-items:center;min-height:44px}
 .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .row>.field{flex:1 1 200px}
 

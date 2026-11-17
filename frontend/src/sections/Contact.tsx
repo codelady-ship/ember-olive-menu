@@ -48,7 +48,7 @@ export default function Contact() {
             <br />
             {SITE.address.street}, {SITE.address.locality} {SITE.address.postalCode}
             <br />
-            <a href={"tel:" + SITE.phone.replace(/\s/g, "")}>{SITE.phone}</a>
+            <a className="tap" href={"tel:" + SITE.phone.replace(/\s/g, "")}>{SITE.phone}</a>
           </address>
           <ul style={{ listStyle: "none", padding: 0, color: "var(--chrome-muted)" }}>
             {SITE.hoursText.map((h) => (

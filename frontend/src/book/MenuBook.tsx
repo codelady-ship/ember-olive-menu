@@ -593,9 +593,10 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
             <p className="eo-kicker eo-fade" style={{ marginTop: "1.4em" }}>
               Wood fire &middot; Olive oil &middot; London
             </p>
-            <h1 className="eo-display" style={{ fontSize: "calc(var(--u) * 5)", margin: ".35em 0 .1em", color: "var(--ember)" }} aria-label={SITE.name} translate="no">
+            {/* The page's single h1 is in Site.tsx; the title page is decorative type. */}
+            <p className="eo-display" style={{ fontSize: "calc(var(--u) * 5)", margin: ".35em 0 .1em", color: "var(--ember)" }} aria-label={SITE.name} translate="no">
               {letters(SITE.name)}
-            </h1>
+            </p>
             <span className="eo-script eo-fade" style={{ margin: 0 }}>
               a menu you can turn
             </span>
@@ -665,7 +666,7 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
                   figures.current.set(p, f)
                 }}
               >
-                <img src={mediaUrl(d.image)} alt={d.alt || d.name} width={1024} height={1024} loading="lazy" decoding="async" draggable={false} onLoad={(e) => e.currentTarget.classList.add("on")} />
+                <img src={mediaUrl(d.image)} alt={d.alt || d.name} width={1024} height={1024} loading={page.n === 0 ? "eager" : "lazy"} fetchPriority={page.n === 0 ? "high" : "auto"} decoding="async" draggable={false} onLoad={(e) => e.currentTarget.classList.add("on")} />
                 {d.video && lifted === p && mode !== "none" && (
                   <video className="eo-clip" src={mediaUrl(d.video)} poster={mediaUrl(d.image)} muted loop playsInline autoPlay aria-hidden="true" onError={(e) => e.currentTarget.remove()} />
                 )}

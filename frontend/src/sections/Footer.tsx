@@ -40,7 +40,7 @@ export default function Footer() {
               <li key={h}>{h}</li>
             ))}
           </ul>
-          <a href="#/admin" rel="nofollow">
+          <a className="tap" href="#/admin" rel="nofollow">
             Staff sign-in
           </a>
         </div>
