@@ -8,6 +8,9 @@ export const SITE = {
   tagline: "Wood fire, olive oil and a menu you can turn",
   description:
     "Ember & Olive is a wood-fired Mediterranean–British restaurant. Turn the pages of our leather menu: truffle tagliatelle, eggs Benedict, fish & chips and the Ruby Citrus Fizz rise from the page in 3D. Book a table or order takeaway.",
+  /** Short version (under 160 characters) for the meta description and social cards. */
+  metaDescription:
+    "Ember & Olive is a fictional wood-fired restaurant with a 3D leather menu book: turn the pages, see dishes rise, book a table or order takeaway.",
   url: (import.meta.env?.VITE_SITE_URL as string | undefined) || "https://codelady-ship.github.io/ember-olive-menu/",
   phone: "+44 20 7946 0321",
   email: "hello@example.com",

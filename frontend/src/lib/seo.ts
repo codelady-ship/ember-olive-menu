@@ -8,6 +8,7 @@ import type { Menu } from "./menu"
 type Site = {
   name: string
   description: string
+  demoNote?: string
   url: string
   phone: string
   email: string
@@ -28,6 +29,7 @@ export function jsonLd(menu: Menu, site: Site, faq: { q: string; a: string }[], 
     "@id": site.url + "#restaurant",
     name: site.name,
     description: site.description,
+    disambiguatingDescription: site.demoNote,
     url: site.url,
     telephone: site.phone,
     email: site.email,
