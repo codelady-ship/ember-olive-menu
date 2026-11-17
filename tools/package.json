@@ -1,0 +1,16 @@
+{
+  "name": "ember-olive-tools",
+  "private": true,
+  "type": "module",
+  "description": "Asset pipeline (dish cut-outs, depth maps, promo art) and visual checks.",
+  "scripts": {
+    "assets": "node prepare-assets.mjs",
+    "promo": "node make-promo.mjs",
+    "serve": "node serve.mjs",
+    "shots": "node shots.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.65.1",
+    "sharp": "^0.35.5"
+  }
+}

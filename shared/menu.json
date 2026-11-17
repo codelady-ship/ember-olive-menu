@@ -1,0 +1,72 @@
+{
+  "currency": "GBP",
+  "sections": [
+    { "slug": "starters", "title": "Starters", "subtitle": "From the wood oven and the cold counter", "order": 1 },
+    { "slug": "brunch", "title": "Brunch", "subtitle": "Saturday and Sunday, until 15:00", "order": 2 },
+    { "slug": "pasta", "title": "Pasta", "subtitle": "Rolled by hand every morning", "order": 3 },
+    { "slug": "mains", "title": "From the Embers", "subtitle": "Cooked over olive wood and charcoal", "order": 4 },
+    { "slug": "desserts", "title": "Desserts", "subtitle": "Something sweet to close the book", "order": 5 },
+    { "slug": "drinks", "title": "Drinks", "subtitle": "Pressed, stirred and poured", "order": 6 }
+  ],
+  "dishes": [
+    {
+      "slug": "truffle-tagliatelle", "name": "Truffle Tagliatelle", "section": "pasta",
+      "description": "Egg tagliatelle rolled this morning, folded through aged parmesan butter and finished at the table with shaved black truffle.",
+      "story": "We roll the dough at seven, rest it under linen and cut it by hand. The sauce is only butter, parmesan and a ladle of the pasta water, so the truffle has the last word.",
+      "priceCents": 1950, "allergens": ["gluten", "eggs", "milk"], "badges": ["signature", "vegetarian"],
+      "available": true, "featured": true, "featuredOrder": 1, "order": 1, "effect": "steam",
+      "image": "menu/truffle-tagliatelle.webp", "depthImage": "menu/truffle-tagliatelle-depth.webp", "video": "",
+      "alt": "A white bowl of ribbon tagliatelle, seen from above, covered with thin shavings of black truffle"
+    },
+    {
+      "slug": "eggs-benedict", "name": "Eggs Benedict", "section": "brunch",
+      "description": "Two poached hen's eggs on a toasted English muffin with smoked ham and a slow-whisked lemon hollandaise.",
+      "story": "The hollandaise is whisked over a bain-marie to order, never held. The eggs come from a farm forty minutes away and are poached for exactly three and a half minutes.",
+      "priceCents": 1250, "allergens": ["eggs", "gluten", "milk"], "badges": ["chef-pick"],
+      "available": true, "featured": true, "featuredOrder": 2, "order": 1, "effect": "steam",
+      "image": "menu/eggs-benedict.webp", "depthImage": "menu/eggs-benedict-depth.webp", "video": "",
+      "alt": "Eggs Benedict on a plate seen from above: poached eggs on muffins coated in yellow hollandaise"
+    },
+    {
+      "slug": "fish-and-chips", "name": "Fish & Chips", "section": "mains",
+      "description": "Line-caught haddock in a crisp ale batter, triple-cooked chips, crushed minted peas and house tartare.",
+      "story": "The batter is made with a local pale ale and fried in beef dripping. The chips are boiled, chilled and fried twice, so they stay fluffy inside and glassy outside.",
+      "priceCents": 1700, "allergens": ["fish", "gluten", "eggs", "mustard"], "badges": ["signature"],
+      "available": true, "featured": true, "featuredOrder": 3, "order": 1, "effect": "steam",
+      "image": "menu/fish-and-chips.webp", "depthImage": "menu/fish-and-chips-depth.webp", "video": "",
+      "alt": "Battered fish and thick chips with peas on a plate, seen from above"
+    },
+    {
+      "slug": "ruby-citrus-fizz", "name": "Ruby Citrus Fizz", "section": "drinks",
+      "description": "Blood orange and pink grapefruit, a dash of rosemary syrup, topped with sparkling water over hand-cut ice.",
+      "story": "Pressed to order from blood oranges and pink grapefruit, sweetened with a syrup of rosemary from the garden and lengthened with cold sparkling water. Bright, bitter-edged and alcohol free.",
+      "priceCents": 750, "allergens": [], "badges": ["non-alcoholic", "vegan", "new"],
+      "available": true, "featured": true, "featuredOrder": 4, "order": 1, "effect": "fizz",
+      "image": "menu/ruby-citrus-fizz.webp", "depthImage": "menu/ruby-citrus-fizz-depth.webp", "video": "",
+      "alt": "A glass of ruby-red citrus drink with ice and an orange slice"
+    },
+
+    { "slug": "olive-focaccia", "name": "Charred Olive Focaccia", "section": "starters", "description": "Warm from the oven with Kalamata olives, rosemary salt and our own olive oil.", "priceCents": 600, "allergens": ["gluten", "sesame"], "badges": ["vegan"], "order": 1 },
+    { "slug": "burrata-blood-orange", "name": "Burrata & Blood Orange", "section": "starters", "description": "Creamy burrata, blood orange, pistachio crumb and basil oil.", "priceCents": 1100, "allergens": ["milk", "nuts"], "badges": ["vegetarian"], "order": 2 },
+    { "slug": "grilled-octopus", "name": "Ember-Grilled Octopus", "section": "starters", "description": "Charred tentacle, smoked paprika potatoes, celery leaf and lemon.", "priceCents": 1400, "allergens": ["molluscs", "celery"], "badges": ["gluten-free"], "order": 3 },
+    { "slug": "whipped-feta", "name": "Whipped Feta & Hot Honey", "section": "starters", "description": "Whipped feta, chilli honey and toasted flatbread.", "priceCents": 900, "allergens": ["milk", "gluten"], "badges": ["vegetarian", "spicy"], "order": 4 },
+
+    { "slug": "shakshuka", "name": "Shakshuka Skillet", "section": "brunch", "description": "Eggs baked in spiced tomato and pepper sauce, labneh and grilled bread.", "priceCents": 1100, "allergens": ["eggs", "milk", "gluten"], "badges": ["vegetarian", "spicy"], "order": 2 },
+    { "slug": "olive-oil-pancakes", "name": "Olive Oil Pancakes", "section": "brunch", "description": "A stack of three with whipped ricotta, roasted figs and honey.", "priceCents": 1000, "allergens": ["gluten", "eggs", "milk"], "badges": ["vegetarian"], "order": 3 },
+
+    { "slug": "crab-linguine", "name": "Lemon & Crab Linguine", "section": "pasta", "description": "Brown and white crab, chilli, garlic, lemon zest and parsley.", "priceCents": 2100, "allergens": ["crustaceans", "gluten", "eggs"], "badges": ["spicy"], "order": 2 },
+    { "slug": "lamb-ragu", "name": "Slow Lamb Ragù Pappardelle", "section": "pasta", "description": "Lamb shoulder braised for six hours in red wine, with pecorino.", "priceCents": 2000, "allergens": ["gluten", "eggs", "milk", "celery", "sulphites"], "badges": [], "order": 3 },
+
+    { "slug": "ember-chicken", "name": "Ember Half Chicken", "section": "mains", "description": "Brined, grilled over charcoal, with mustard-seed salsa verde.", "priceCents": 1800, "allergens": ["mustard"], "badges": ["gluten-free"], "order": 2 },
+    { "slug": "charcoal-aubergine", "name": "Charcoal Aubergine", "section": "mains", "description": "Blackened aubergine, tahini, pomegranate and herbs.", "priceCents": 1500, "allergens": ["sesame"], "badges": ["vegan", "gluten-free"], "order": 3 },
+    { "slug": "ribeye", "name": "28-Day Ribeye", "section": "mains", "description": "Dry-aged ribeye with bone-marrow butter and watercress.", "priceCents": 3200, "allergens": ["milk"], "badges": ["gluten-free"], "order": 4 },
+
+    { "slug": "olive-oil-cake", "name": "Olive Oil Cake", "section": "desserts", "description": "Citrus olive oil cake, mascarpone and candied almonds.", "priceCents": 800, "allergens": ["eggs", "gluten", "milk", "nuts"], "badges": ["vegetarian"], "order": 1 },
+    { "slug": "basque-cheesecake", "name": "Burnt Basque Cheesecake", "section": "desserts", "description": "Caramelised top, soft centre, sour cherries.", "priceCents": 850, "allergens": ["eggs", "milk"], "badges": ["vegetarian", "gluten-free"], "order": 2 },
+    { "slug": "chocolate-mousse", "name": "Dark Chocolate Mousse", "section": "desserts", "description": "70% chocolate, olive oil and flaky sea salt.", "priceCents": 800, "allergens": ["eggs", "milk", "soya"], "badges": ["vegetarian"], "order": 3 },
+
+    { "slug": "rosemary-lemonade", "name": "Smoked Rosemary Lemonade", "section": "drinks", "description": "Pressed lemons and a whisper of smoked rosemary.", "priceCents": 550, "allergens": [], "badges": ["non-alcoholic", "vegan"], "order": 2 },
+    { "slug": "house-negroni", "name": "House Negroni", "section": "drinks", "description": "Gin, bitter aperitivo and olive-leaf vermouth.", "priceCents": 1100, "allergens": ["sulphites"], "badges": [], "order": 3 },
+    { "slug": "espresso", "name": "Espresso", "section": "drinks", "description": "A single-origin double shot.", "priceCents": 300, "allergens": [], "badges": ["vegan"], "order": 4 }
+  ]
+}
