@@ -26,6 +26,8 @@ Form bodies accept a hidden `website` honeypot field that must stay empty.
 
 ## Admin (Bearer JWT from `/auth/login`)
 
+`/auth/login` answers `{ token, email, role }`. Role `demo` (the public demo admin seeded by `npm run seed`) may call every GET below; every other method answers 403 `Demo admin is read-only: changes are not saved.`
+
 | Method | Path | Notes |
 |---|---|---|
 | GET / POST | `/admin/sections` | List / create `{ slug, title, subtitle?, order? }`. |

@@ -1,8 +1,75 @@
 import * as React from "react"
 import { API, ApiError, hasApi, mediaUrl, post, request } from "../lib/api"
 import { ALLERGEN_LABEL, BADGE_LABEL, money } from "../lib/menu"
+import { SANDBOX_TOKEN, resetSandbox, sandboxRequest } from "./sandbox"
 
 const KEY = "eo-admin-token"
+const ROLE_KEY = "eo-admin-role"
+/** Public by design: the server seeds it as a read-only "demo" admin (backend/src/seed/seed.ts). */
+const DEMO_ADMIN = { email: "demo@ember-olive.demo", password: "demo1234" }
+type Role = "admin" | "demo" | "sandbox"
+
+/** Admin calls: the in-browser sandbox for the sandbox token, the API otherwise. A 403 also shows a toast. */
+async function call<T>(path: string, init: RequestInit & { token?: string } = {}): Promise<T> {
+  try {
+    if (init.token === SANDBOX_TOKEN) return await sandboxRequest<T>(path, init)
+    return await request<T>(path, init)
+  } catch (x) {
+    if (x instanceof ApiError && x.status === 403) toast(x.message)
+    throw x
+  }
+}
+
+function toast(message: string) {
+  window.dispatchEvent(new CustomEvent("eo-toast", { detail: message }))
+}
+
+function Toast() {
+  const [msg, setMsg] = React.useState("")
+  React.useEffect(() => {
+    let t = 0
+    const on = (e: Event) => {
+      setMsg((e as CustomEvent<string>).detail)
+      window.clearTimeout(t)
+      t = window.setTimeout(() => setMsg(""), 4000)
+    }
+    window.addEventListener("eo-toast", on)
+    return () => {
+      window.removeEventListener("eo-toast", on)
+      window.clearTimeout(t)
+    }
+  }, [])
+  return (
+    <div className="admin-toast" role="status" aria-live="polite" hidden={!msg}>
+      {msg}
+    </div>
+  )
+}
+
+function store(key: string, value: string) {
+  try {
+    if (value) sessionStorage.setItem(key, value)
+    else sessionStorage.removeItem(key)
+  } catch {
+    /* private mode: the session still works for this tab */
+  }
+}
+
+/** true when the API answers its health check within 8 s; false sends the demo to the sandbox. */
+function useApiUp() {
+  const [up, setUp] = React.useState<boolean | null>(hasApi() ? null : false)
+  React.useEffect(() => {
+    if (!hasApi()) return
+    const ctrl = new AbortController()
+    const t = window.setTimeout(() => ctrl.abort(), 8000)
+    fetch(API + "/api/health", { signal: ctrl.signal })
+      .then((r) => setUp(r.ok))
+      .catch(() => setUp(false))
+      .finally(() => window.clearTimeout(t))
+    return () => ctrl.abort()
+  }, [])
+  return up
+}
 const ALLERGENS = Object.keys(ALLERGEN_LABEL)
 const BADGES = Object.keys(BADGE_LABEL)
 
@@ -33,16 +100,19 @@ type Msg = { _id: string; name: string; email: string; subject: string; message:
 
 const blank = (): AdminDish => ({ slug: "", name: "", section: "", description: "", story: "", priceCents: 0, allergens: [], badges: [], available: true, featured: false, featuredOrder: 0, order: 0, effect: "none", image: "", depthImage: "", video: "", alt: "" })
 
-function readToken() {
+function readToken(key = KEY) {
   try {
-    return sessionStorage.getItem(KEY) || ""
+    return sessionStorage.getItem(key) || ""
   } catch {
     return ""
   }
 }
 
 export default function Admin() {
-  const [token, setToken] = React.useState(readToken)
+  const [token, setToken] = React.useState(() => readToken())
+  const [role, setRole] = React.useState<Role>(() => (readToken() === SANDBOX_TOKEN ? "sandbox" : readToken(ROLE_KEY) === "demo" ? "demo" : "admin"))
+  const apiUp = useApiUp()
+  const [reset, setReset] = React.useState(0)
   const [tab, setTab] = React.useState<"dishes" | "reservations" | "orders" | "messages" | "subscribers">("dishes")
 
   React.useEffect(() => {
@@ -54,28 +124,25 @@ export default function Admin() {
     return () => m.remove()
   }, [])
 
-  const signOut = () => {
-    try {
-      sessionStorage.removeItem(KEY)
-    } catch {
-      /* private mode */
-    }
+  const signOut = React.useCallback(() => {
+    store(KEY, "")
+    store(ROLE_KEY, "")
     setToken("")
+  }, [])
+  const signIn = (t: string, r: Role) => {
+    store(KEY, t)
+    store(ROLE_KEY, r)
+    setRole(r)
+    setToken(t)
   }
 
-  if (!hasApi())
+  if (!token)
     return (
-      <div className="admin">
-        <div className="wrap">
-          <h1>Staff</h1>
-          <p className="note">This copy of the site is not connected to an API (VITE_API_URL is not set), so there is nothing to manage here.</p>
-          <p>
-            <a href="#top">Back to the menu</a>
-          </p>
-        </div>
-      </div>
+      <>
+        <Login onSignIn={signIn} apiUp={apiUp} />
+        <Toast />
+      </>
     )
-  if (!token) return <Login onToken={setToken} />
 
   const tabs = ["dishes", "reservations", "orders", "messages", "subscribers"] as const
   return (
@@ -94,6 +161,28 @@ export default function Admin() {
             </button>
           </div>
         </div>
+        {role !== "admin" && (
+          <div className="note demo-note" role="note">
+            <p>
+              <strong>Demo mode.</strong>{" "}
+              {role === "demo" ? "Read-only demo admin: every page opens, changes are not saved." : "Changes are not saved: they stay in this browser tab until you reset or close it."}
+            </p>
+            {role === "sandbox" && (
+              <button
+                className="btn small"
+                type="button"
+                onClick={() => {
+                  if (!window.confirm("Reset the demo data in this tab?")) return
+                  resetSandbox()
+                  setReset((n) => n + 1)
+                  toast("Demo data reset.")
+                }}
+              >
+                Reset demo data
+              </button>
+            )}
+          </div>
+        )}
         <div className="tabs" role="tablist" aria-label="Sections">
           {tabs.map((t) => (
             <button key={t} type="button" role="tab" id={"tab-" + t} aria-controls={"panel-" + t} aria-selected={tab === t} onClick={() => setTab(t)}>
@@ -101,7 +190,7 @@ export default function Admin() {
             </button>
           ))}
         </div>
-        <div role="tabpanel" id={"panel-" + tab} aria-labelledby={"tab-" + tab}>
+        <div role="tabpanel" id={"panel-" + tab} aria-labelledby={"tab-" + tab} key={reset}>
           {tab === "dishes" && <Dishes token={token} onAuth={signOut} />}
           {tab === "reservations" && <Reservations token={token} onAuth={signOut} />}
           {tab === "orders" && <Orders token={token} onAuth={signOut} />}
@@ -109,11 +198,12 @@ export default function Admin() {
           {tab === "subscribers" && <Subscribers token={token} onAuth={signOut} />}
         </div>
       </div>
+      <Toast />
     </div>
   )
 }
 
-function Login({ onToken }: { onToken: (t: string) => void }) {
+function Login({ onSignIn, apiUp }: { onSignIn: (token: string, role: Role) => void; apiUp: boolean | null }) {
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [err, setErr] = React.useState("")
@@ -123,15 +213,23 @@ function Login({ onToken }: { onToken: (t: string) => void }) {
     setBusy(true)
     setErr("")
     try {
-      const r = await post<{ token: string }>("/api/auth/login", { email, password })
-      try {
-        sessionStorage.setItem(KEY, r.token)
-      } catch {
-        /* the session still works for this tab */
-      }
-      onToken(r.token)
+      const r = await post<{ token: string; role?: string }>("/api/auth/login", { email, password })
+      onSignIn(r.token, r.role === "demo" ? "demo" : "admin")
     } catch (x) {
       setErr((x as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const demo = async () => {
+    setErr("")
+    if (!apiUp) return onSignIn(SANDBOX_TOKEN, "sandbox")
+    setBusy(true)
+    try {
+      const r = await post<{ token: string }>("/api/auth/login", DEMO_ADMIN)
+      onSignIn(r.token, "demo")
+    } catch {
+      onSignIn(SANDBOX_TOKEN, "sandbox") // demo account missing or the API fell asleep: use the in-browser copy
     } finally {
       setBusy(false)
     }
@@ -140,6 +238,21 @@ function Login({ onToken }: { onToken: (t: string) => void }) {
     <div className="admin">
       <div className="wrap" style={{ maxWidth: 440 }}>
         <h1>Staff sign-in</h1>
+        <div className="note demo-note">
+          <p>Just looking around? Open the panel as a demo admin. No real data can be changed.</p>
+          <button className="btn solid" type="button" onClick={demo} disabled={busy || apiUp === null}>
+            {apiUp === null ? "Checking the server…" : "Demo admin"}
+          </button>
+          <p className="demo-hint">
+            {apiUp ? (
+              <>
+                Or sign in below with <strong>{DEMO_ADMIN.email}</strong> / <strong>{DEMO_ADMIN.password}</strong> (read-only).
+              </>
+            ) : (
+              "The server is not reachable, so the demo runs in this browser tab with sample data."
+            )}
+          </p>
+        </div>
         <form className="form" onSubmit={submit}>
           <div className="field">
             <label htmlFor="a-email">Email</label>
@@ -154,7 +267,7 @@ function Login({ onToken }: { onToken: (t: string) => void }) {
               {err}
             </p>
           )}
-          <button className="btn solid" type="submit" disabled={busy}>
+          <button className="btn solid" type="submit" disabled={busy || !apiUp}>
             {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>
@@ -169,7 +282,7 @@ function useAdmin<T>(path: string, token: string, onAuth: () => void) {
   const [err, setErr] = React.useState("")
   const load = React.useCallback(async () => {
     try {
-      setData(await request<T>(path, { token }))
+      setData(await call<T>(path, { token }))
       setErr("")
     } catch (x) {
       if ((x as ApiError).status === 401) onAuth()
@@ -192,8 +305,8 @@ function Dishes({ token, onAuth }: { token: string; onAuth: () => void }) {
     setSaved("")
     try {
       const { _id, ...body } = d
-      if (_id) await request("/api/admin/dishes/" + _id, { method: "PATCH", body: JSON.stringify(body), token })
-      else await request("/api/admin/dishes", { method: "POST", body: JSON.stringify(body), token })
+      if (_id) await call("/api/admin/dishes/" + _id, { method: "PATCH", body: JSON.stringify(body), token })
+      else await call("/api/admin/dishes", { method: "POST", body: JSON.stringify(body), token })
       setSaved("Saved " + d.name + ".")
       setEdit(null)
       reload()
@@ -205,7 +318,7 @@ function Dishes({ token, onAuth }: { token: string; onAuth: () => void }) {
   const remove = async (d: AdminDish) => {
     if (!d._id || !window.confirm("Delete " + d.name + "? This cannot be undone.")) return
     try {
-      await request("/api/admin/dishes/" + d._id, { method: "DELETE", token })
+      await call("/api/admin/dishes/" + d._id, { method: "DELETE", token })
       reload()
     } catch (x) {
       setErr((x as Error).message)
@@ -289,7 +402,7 @@ function DishForm({ dish, sections, token, onSave, onCancel }: { dish: AdminDish
     const fd = new FormData()
     fd.append("image", file)
     try {
-      const r = await request<{ url: string }>("/api/admin/uploads", { method: "POST", body: fd, token })
+      const r = await call<{ url: string }>("/api/admin/uploads", { method: "POST", body: fd, token })
       up(field, r.url)
     } catch (x) {
       setUpErr((x as Error).message)
@@ -432,7 +545,7 @@ function Reservations({ token, onAuth }: { token: string; onAuth: () => void }) 
   const { data, err, reload, setErr } = useAdmin<{ items: Res[]; total: number }>("/api/admin/reservations?limit=200" + (date ? "&date=" + date : ""), token, onAuth)
   const setStatus = async (r: Res, status: string) => {
     try {
-      await request("/api/admin/reservations/" + r._id, { method: "PATCH", body: JSON.stringify({ status }), token })
+      await call("/api/admin/reservations/" + r._id, { method: "PATCH", body: JSON.stringify({ status }), token })
       reload()
     } catch (x) {
       setErr((x as Error).message)
@@ -499,7 +612,7 @@ function Orders({ token, onAuth }: { token: string; onAuth: () => void }) {
   const { data, err, reload, setErr } = useAdmin<{ items: OrderRow[]; total: number }>("/api/admin/orders?limit=100", token, onAuth)
   const setStatus = async (o: OrderRow, status: string) => {
     try {
-      await request("/api/admin/orders/" + o._id, { method: "PATCH", body: JSON.stringify({ status }), token })
+      await call("/api/admin/orders/" + o._id, { method: "PATCH", body: JSON.stringify({ status }), token })
       reload()
     } catch (x) {
       setErr((x as Error).message)
@@ -563,8 +676,8 @@ function Messages({ token, onAuth }: { token: string; onAuth: () => void }) {
     try {
       if (how === "delete") {
         if (!window.confirm("Delete this message?")) return
-        await request("/api/admin/messages/" + m._id, { method: "DELETE", token })
-      } else await request("/api/admin/messages/" + m._id, { method: "PATCH", body: JSON.stringify({ read: !m.read }), token })
+        await call("/api/admin/messages/" + m._id, { method: "DELETE", token })
+      } else await call("/api/admin/messages/" + m._id, { method: "PATCH", body: JSON.stringify({ read: !m.read }), token })
       reload()
     } catch (x) {
       setErr((x as Error).message)

@@ -3,6 +3,8 @@ import path from "node:path"
 import request from "supertest"
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { Dish } from "../src/models/Dish.js"
+import { Admin } from "../src/models/misc.js"
+import { DEMO_ADMIN, seedDemoAdmin } from "../src/seed/seed.js"
 import { ADMIN, login, makeApp, resetDb, startDb, stopDb, testConfig } from "./helpers.js"
 
 const cfg = testConfig()
@@ -113,5 +115,35 @@ describe("orders and messages for the kitchen", () => {
     const id = list.body.items[0]._id
     await request(app).patch("/api/admin/messages/" + id).set(auth()).send({ read: true }).expect(200)
     await request(app).delete("/api/admin/messages/" + id).set(auth()).expect(204)
+  })
+})
+
+describe("public demo admin", () => {
+  it("is created by the seed, reads every admin page and cannot write", async () => {
+    expect(await seedDemoAdmin({})).toBe(DEMO_ADMIN.email)
+    const r = await request(app).post("/api/auth/login").send(DEMO_ADMIN).expect(200)
+    expect(r.body.role).toBe("demo")
+    const demo = { Authorization: "Bearer " + r.body.token }
+    expect((await request(app).get("/api/auth/me").set(demo).expect(200)).body.role).toBe("demo")
+    for (const p of ["/api/admin/sections", "/api/admin/dishes", "/api/admin/reservations", "/api/admin/orders", "/api/admin/messages", "/api/admin/subscribers"]) {
+      await request(app).get(p).set(demo).expect(200)
+    }
+    const dish = (await request(app).get("/api/admin/dishes").set(demo)).body[0]
+    const writes = [
+      request(app).post("/api/admin/dishes").set(demo).send({ slug: "demo-dish", name: "Demo", section: "pasta", priceCents: 100 }),
+      request(app).patch("/api/admin/dishes/" + dish._id).set(demo).send({ priceCents: 1 }),
+      request(app).delete("/api/admin/dishes/" + dish._id).set(demo),
+      request(app).post("/api/admin/uploads").set(demo).attach("image", PNG, { filename: "a.png", contentType: "image/png" }),
+    ]
+    for (const w of writes) {
+      const res = await w.expect(403)
+      expect(res.body.error).toMatch(/read-only/)
+    }
+    expect((await Dish.findById(dish._id).lean())?.priceCents).toBe(dish.priceCents)
+    // a real admin keeps full rights, and the seed never turns a real admin into a demo one
+    await request(app).patch("/api/admin/dishes/" + dish._id).set(auth()).send({ priceCents: dish.priceCents + 1 }).expect(200)
+    await Admin.updateOne({ email: DEMO_ADMIN.email }, { $set: { role: "admin" } })
+    expect(await seedDemoAdmin({})).toBeNull()
+    expect(await seedDemoAdmin({ DEMO_ADMIN: "false" })).toBeNull()
   })
 })

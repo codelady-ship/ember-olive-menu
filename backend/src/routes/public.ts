@@ -180,14 +180,15 @@ export function publicRoutes(cfg: Config, opts: { now: () => Date; limits: { for
       const admin = await Admin.findOne({ email: b.email }).lean()
       const ok = await bcrypt.compare(b.password, admin?.passwordHash || (await dummy()))
       if (!admin || !ok) throw new HttpError(401, "Email or password is incorrect.")
-      res.json({ token: signAdmin(cfg, String(admin._id)), email: admin.email })
+      const role = admin.role === "demo" ? "demo" : "admin"
+      res.json({ token: signAdmin(cfg, String(admin._id), role), email: admin.email, role })
     }),
   )
   r.get(
     "/auth/me",
     requireAdmin(cfg),
     ah(async (req, res) => {
-      res.json({ email: locals(req).admin?.email })
+      res.json({ email: locals(req).admin?.email, role: locals(req).admin?.role })
     }),
   )
 
