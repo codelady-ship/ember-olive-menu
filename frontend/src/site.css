@@ -152,29 +152,71 @@ textarea.input{min-height:120px;resize:vertical}
 .viewer-fallback img{max-height:70%;width:auto}
 .icon-btn{appearance:none;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:none;color:var(--chrome);font-size:22px;cursor:pointer;display:grid;place-items:center}
 
-/* admin */
-.admin{min-height:100svh;background:var(--bg);padding:24px 0 80px}
-.admin h1{font-family:var(--f-display);font-size:40px;margin:0 0 4px}
-.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:18px 0 24px;border-bottom:1px solid var(--line)}
-.tabs button{appearance:none;border:0;background:none;color:var(--chrome-muted);font:inherit;font-size:15px;letter-spacing:.12em;text-transform:uppercase;min-height:44px;padding:0 14px;cursor:pointer;border-bottom:2px solid transparent}
-.tabs button[aria-selected="true"]{color:var(--chrome);border-color:var(--gold)}
-.table-wrap{position:relative;overflow-x:auto;border:1px solid var(--line);border-radius:8px}
-table.data{width:100%;min-width:720px;border-collapse:collapse;font-size:15px}
-table.data th,table.data td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
-table.data th{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--chrome-muted)}
-.checks{display:flex;flex-wrap:wrap;gap:6px 14px}
-.checks label{display:inline-flex;align-items:center;gap:6px;min-height:44px;font-size:15px;text-transform:none;letter-spacing:0;color:var(--chrome)}
-.checks input{width:20px;height:20px}
-.thumb{width:72px;height:72px;max-width:none;object-fit:contain;background:#f2e7cd;border-radius:6px}
-.demo-note{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin:16px 0;border-color:rgba(201,162,74,.5)}
+/* admin: a sheet of the menu's paper on the walnut table. Everything is scoped to .admin, so the
+   public pages keep their own .btn/.input/.note. Inside the sheet the chrome tokens are re-pointed at the
+   book's ink colours, which also re-colours the few inline var(--chrome-muted) uses in Admin.tsx. */
+.admin{position:relative;min-height:100svh;padding:clamp(16px,4vw,40px) 0 96px;background:var(--desk);color:var(--chrome)}
+.admin::before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(70% 55% at 50% 0%,rgba(255,196,120,.22),transparent 70%),radial-gradient(120% 95% at 50% 42%,var(--desk-hi) 0%,var(--desk) 55%,var(--desk-lo) 100%)}
+.admin>.wrap{position:relative;padding:clamp(16px,3.5vw,40px);border-radius:6px;color-scheme:light;
+  --chrome:var(--ink);--chrome-muted:var(--muted);--line:color-mix(in srgb,var(--ink) 18%,transparent);--edge:color-mix(in srgb,var(--ink) 55%,transparent);--field:color-mix(in srgb,var(--paper) 45%,#fff);
+  background:radial-gradient(120% 90% at 50% 0%,#f8efda,var(--paper) 60%);color:var(--ink);
+  box-shadow:0 0 0 1px rgba(201,162,74,.6),0 26px 60px rgba(0,0,0,.55)}
+.admin h1{font-family:var(--f-display);font-weight:700;font-size:clamp(30px,5vw,40px);line-height:1.1;margin:0;color:var(--ink)}
+.admin h2,.admin h3{font-family:var(--f-display);font-weight:600;line-height:1.2;color:var(--ink)}
+.admin h2{font-size:28px}
+.admin h3{font-size:22px}
+.admin strong,.admin th{font-weight:600}
+.admin a:not(.btn){color:var(--ember)}
+.admin small{font-size:13px;color:var(--muted)}
+.admin :focus-visible{outline:2px solid var(--ember);outline-offset:3px}
+.admin .wrap>.row:first-child{row-gap:12px}
+
+.admin .btn{border-color:var(--edge);color:var(--ink);font-weight:500}
+.admin .btn:hover:not(:disabled){background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.admin .btn.solid{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.admin .btn.solid:hover:not(:disabled){background:var(--desk-hi);border-color:var(--desk-hi);color:var(--paper)}
+.admin .btn.danger{border-color:var(--ember);background:var(--ember);color:#fff}
+.admin .btn.danger:hover:not(:disabled){background:#c0492b;border-color:#c0492b;color:#fff}
+.admin .btn:disabled{opacity:1;border-color:var(--line);background:color-mix(in srgb,var(--ink) 8%,transparent);color:var(--muted)}
+
+.admin .input,.admin select.input,.admin textarea.input{border-color:var(--edge);background:var(--field);color:var(--ink);min-height:48px}
+.admin .input:focus{border-color:var(--ember);box-shadow:0 0 0 3px rgba(168,60,22,.25)}
+.admin .input[aria-invalid="true"]{border-color:var(--ember)}
+.admin .input::placeholder{color:var(--muted);opacity:1}
+.admin select.input option{background:var(--field);color:var(--ink)}
+.admin input[type="checkbox"]{accent-color:var(--ember)}
+.admin input[type="file"]{min-height:44px;font:inherit;font-size:15px;color:var(--muted)}
+.admin .err{color:var(--ember)}
+
+.admin .note{border-color:var(--line);background:color-mix(in srgb,var(--ink) 4%,transparent);color:var(--ink)}
+.admin .note.ok{border-color:var(--olive);color:var(--olive)}
+.admin .note.bad{border-color:var(--ember);color:#8a2f10}
+.admin .note.read{color:var(--muted)}
+.admin .note.read h3{color:var(--muted)}
+.admin p.note{margin:0 0 16px}
+.demo-note{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin:20px 0}
+.admin .demo-note{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 16%,transparent)}
 .demo-note p{margin:0;flex:1 1 260px}
-.demo-note .demo-hint{flex-basis:100%;font-size:14px;color:var(--chrome-muted)}
+.demo-note .demo-hint{flex-basis:100%;font-size:14px;color:var(--muted)}
+.demo-note .demo-err{flex-basis:100%}
+
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin:20px 0 24px;border-bottom:1px solid var(--line)}
+.tabs button{appearance:none;border:0;background:none;color:var(--muted);font:inherit;font-size:14px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;min-height:44px;padding:0 14px;margin-bottom:-1px;cursor:pointer;border-bottom:2px solid transparent}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--ink);border-color:var(--ember)}
+
+.table-wrap{position:relative;overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:color-mix(in srgb,var(--paper) 45%,#fff)}
+table.data{width:100%;min-width:720px;border-collapse:collapse;font-size:16px;font-variant-numeric:tabular-nums}
+table.data th,table.data td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.data tbody tr:last-child td{border-bottom:0}
+table.data th{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);white-space:nowrap;background:color-mix(in srgb,var(--ink) 5%,transparent)}
 table.data select.input{min-width:150px}
-.admin-toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:50;max-width:calc(100% - 32px);padding:12px 18px;border-radius:8px;background:var(--gold-hi);color:#140e08;font-size:15px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.checks{display:flex;flex-wrap:wrap;gap:6px 14px}
+.checks label{display:inline-flex;align-items:center;gap:6px;min-height:44px;font-size:15px;text-transform:none;letter-spacing:0;color:var(--ink)}
+.checks input{width:20px;height:20px}
+.thumb{display:block;width:64px;height:64px;max-width:none;object-fit:contain;background:var(--paper);border:1px solid var(--line);border-radius:6px}
+.admin-toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:50;max-width:calc(100% - 32px);padding:12px 18px;border-radius:6px;background:var(--ink);color:var(--paper);font-size:16px;box-shadow:0 0 0 1px rgba(201,162,74,.6),0 10px 30px rgba(0,0,0,.4)}
 .admin-toast[hidden]{display:none}
 .confirm-pair{display:inline-flex;align-items:center;gap:8px}
 .confirm-pair .btn{min-width:44px;white-space:nowrap}
-.btn.danger{border-color:#c0492b;background:#a83c16;color:#fff}
-.btn.danger:hover:not(:disabled){background:#c0492b;color:#fff}
 .row.nowrap{flex-wrap:nowrap}
-.demo-note .demo-err{flex-basis:100%}

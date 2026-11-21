@@ -707,7 +707,7 @@ function Messages({ token, onAuth }: { token: string; onAuth: () => void }) {
         </p>
       )}
       {(data?.items || []).map((m) => (
-        <article key={m._id} className="note" style={{ marginBottom: 12, opacity: m.read ? 0.7 : 1 }}>
+        <article key={m._id} className={m.read ? "note read" : "note"} style={{ marginBottom: 12 }}>
           <h3 style={{ margin: "0 0 4px", fontFamily: "var(--f-display)" }}>{m.subject || "(no subject)"}</h3>
           <p style={{ margin: "0 0 8px", color: "var(--chrome-muted)" }}>
             {m.name} · <a href={"mailto:" + m.email}>{m.email}</a> · {new Date(m.createdAt).toLocaleString("en-GB")}
