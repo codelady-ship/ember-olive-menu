@@ -181,6 +181,7 @@ export function publicRoutes(cfg: Config, opts: { now: () => Date; limits: { for
       const ok = await bcrypt.compare(b.password, admin?.passwordHash || (await dummy()))
       if (!admin || !ok) throw new HttpError(401, "Email or password is incorrect.")
       const role = admin.role === "demo" ? "demo" : "admin"
+      if (role === "demo" && !cfg.DEMO_ADMIN) throw new HttpError(401, "Email or password is incorrect.") // kill switch
       res.json({ token: signAdmin(cfg, String(admin._id), role), email: admin.email, role })
     }),
   )

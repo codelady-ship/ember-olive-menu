@@ -1,6 +1,7 @@
 import * as React from "react"
 import { API, ApiError, hasApi, mediaUrl, post, request } from "../lib/api"
 import { ALLERGEN_LABEL, BADGE_LABEL, money } from "../lib/menu"
+import { ConfirmButton } from "./ConfirmButton"
 import { SANDBOX_TOKEN, resetSandbox, sandboxRequest } from "./sandbox"
 
 const KEY = "eo-admin-token"
@@ -165,21 +166,20 @@ export default function Admin() {
           <div className="note demo-note" role="note">
             <p>
               <strong>Demo mode.</strong>{" "}
-              {role === "demo" ? "Read-only demo admin: every page opens, changes are not saved." : "Changes are not saved: they stay in this browser tab until you reset or close it."}
+              {role === "demo" ? "Read-only demo admin: every page opens, changes are not saved and guest details are hidden." : "Changes are not saved: they stay in this browser tab until you reset or close it."}
             </p>
             {role === "sandbox" && (
-              <button
-                className="btn small"
-                type="button"
-                onClick={() => {
-                  if (!window.confirm("Reset the demo data in this tab?")) return
+              <ConfirmButton
+                confirmLabel="Yes, reset"
+                question="Reset the demo data in this tab?"
+                onConfirm={() => {
                   resetSandbox()
                   setReset((n) => n + 1)
                   toast("Demo data reset.")
                 }}
               >
                 Reset demo data
-              </button>
+              </ConfirmButton>
             )}
           </div>
         )}
@@ -221,15 +221,24 @@ function Login({ onSignIn, apiUp }: { onSignIn: (token: string, role: Role) => v
       setBusy(false)
     }
   }
+  // The Demo admin button. Without a reachable API it opens the in-browser sandbox (the hint below says so).
+  // If the API answers but refuses the demo login (switched off, rate limit), the error is shown and the
+  // button then offers the sandbox explicitly, so nobody lands in it without being told.
+  const [demoErr, setDemoErr] = React.useState("")
   const demo = async () => {
     setErr("")
-    if (!apiUp) return onSignIn(SANDBOX_TOKEN, "sandbox")
+    if (!apiUp || demoErr) return onSignIn(SANDBOX_TOKEN, "sandbox")
     setBusy(true)
     try {
       const r = await post<{ token: string }>("/api/auth/login", DEMO_ADMIN)
       onSignIn(r.token, "demo")
-    } catch {
-      onSignIn(SANDBOX_TOKEN, "sandbox") // demo account missing or the API fell asleep: use the in-browser copy
+    } catch (x) {
+      const e = x as ApiError
+      if (!e.status) {
+        // the API fell asleep after the health check: nothing was refused, use the in-browser copy
+        onSignIn(SANDBOX_TOKEN, "sandbox")
+        toast("The server did not answer, so the demo runs in this browser tab.")
+      } else setDemoErr(e.status === 401 ? "The demo admin is switched off on this server." : e.message)
     } finally {
       setBusy(false)
     }
@@ -241,8 +250,13 @@ function Login({ onSignIn, apiUp }: { onSignIn: (token: string, role: Role) => v
         <div className="note demo-note">
           <p>Just looking around? Open the panel as a demo admin. No real data can be changed.</p>
           <button className="btn solid" type="button" onClick={demo} disabled={busy || apiUp === null}>
-            {apiUp === null ? "Checking the server…" : "Demo admin"}
+            {apiUp === null ? "Checking the server…" : demoErr ? "Open the in-browser demo" : "Demo admin"}
           </button>
+          {demoErr && (
+            <p className="note bad demo-err" role="alert">
+              {demoErr} You can still try the panel with sample data that stays in this browser tab.
+            </p>
+          )}
           <p className="demo-hint">
             {apiUp ? (
               <>
@@ -316,9 +330,11 @@ function Dishes({ token, onAuth }: { token: string; onAuth: () => void }) {
     }
   }
   const remove = async (d: AdminDish) => {
-    if (!d._id || !window.confirm("Delete " + d.name + "? This cannot be undone.")) return
+    if (!d._id) return
+    setSaved("")
     try {
       await call("/api/admin/dishes/" + d._id, { method: "DELETE", token })
+      setSaved("Deleted " + d.name + ".")
       reload()
     } catch (x) {
       setErr((x as Error).message)
@@ -369,13 +385,13 @@ function Dishes({ token, onAuth }: { token: string; onAuth: () => void }) {
                 <td>{d.featured ? d.featuredOrder : "—"}</td>
                 <td>{d.available ? "Yes" : "Sold out"}</td>
                 <td>
-                  <div className="row">
+                  <div className="row nowrap">
                     <button className="btn small" type="button" onClick={() => setEdit({ ...blank(), ...d })}>
                       Edit
                     </button>
-                    <button className="btn small" type="button" onClick={() => remove(d)}>
+                    <ConfirmButton question={"Delete " + d.name + "? This cannot be undone."} onConfirm={() => remove(d)}>
                       Delete
-                    </button>
+                    </ConfirmButton>
                   </div>
                 </td>
               </tr>
@@ -675,8 +691,8 @@ function Messages({ token, onAuth }: { token: string; onAuth: () => void }) {
   const act = async (m: Msg, how: "read" | "delete") => {
     try {
       if (how === "delete") {
-        if (!window.confirm("Delete this message?")) return
         await call("/api/admin/messages/" + m._id, { method: "DELETE", token })
+        toast("Message deleted.")
       } else await call("/api/admin/messages/" + m._id, { method: "PATCH", body: JSON.stringify({ read: !m.read }), token })
       reload()
     } catch (x) {
@@ -701,9 +717,9 @@ function Messages({ token, onAuth }: { token: string; onAuth: () => void }) {
             <button className="btn small" type="button" onClick={() => act(m, "read")}>
               {m.read ? "Mark unread" : "Mark read"}
             </button>
-            <button className="btn small" type="button" onClick={() => act(m, "delete")}>
+            <ConfirmButton question={"Delete the message from " + m.name + "?"} onConfirm={() => act(m, "delete")}>
               Delete
-            </button>
+            </ConfirmButton>
           </div>
         </article>
       ))}

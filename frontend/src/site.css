@@ -172,3 +172,9 @@ table.data th{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color
 table.data select.input{min-width:150px}
 .admin-toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:50;max-width:calc(100% - 32px);padding:12px 18px;border-radius:8px;background:var(--gold-hi);color:#140e08;font-size:15px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
 .admin-toast[hidden]{display:none}
+.confirm-pair{display:inline-flex;align-items:center;gap:8px}
+.confirm-pair .btn{min-width:44px;white-space:nowrap}
+.btn.danger{border-color:#c0492b;background:#a83c16;color:#fff}
+.btn.danger:hover:not(:disabled){background:#c0492b;color:#fff}
+.row.nowrap{flex-wrap:nowrap}
+.demo-note .demo-err{flex-basis:100%}

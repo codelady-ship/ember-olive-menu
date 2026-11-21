@@ -9,7 +9,7 @@ mongoose.set("strictQuery", true)
 await mongoose.connect(cfg.MONGODB_URI, { serverSelectionTimeoutMS: 10_000 })
 // Build unique indexes before taking traffic: the reservation counter depends on them.
 await Promise.all(Object.values(mongoose.models).map((m) => m.syncIndexes()))
-// The free host has no shell, so the public read-only demo admin is (re)created on start. DEMO_ADMIN=false skips it.
+// The free host has no shell, so the public read-only demo admin is (re)created on start. DEMO_ADMIN=false removes it.
 await seedDemoAdmin()
 
 const server = createApp(cfg).listen(cfg.PORT, () => {

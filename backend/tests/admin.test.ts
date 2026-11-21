@@ -2,6 +2,7 @@ import fs from "node:fs"
 import path from "node:path"
 import request from "supertest"
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
+import { DEMO_VIEWS } from "../src/lib/demo.js"
 import { Dish } from "../src/models/Dish.js"
 import { Admin } from "../src/models/misc.js"
 import { DEMO_ADMIN, seedDemoAdmin } from "../src/seed/seed.js"
@@ -145,5 +146,122 @@ describe("public demo admin", () => {
     await Admin.updateOne({ email: DEMO_ADMIN.email }, { $set: { role: "admin" } })
     expect(await seedDemoAdmin({})).toBeNull()
     expect(await seedDemoAdmin({ DEMO_ADMIN: "false" })).toBeNull()
+  })
+})
+
+describe("public demo admin never sees personal data", () => {
+  const SECRET = {
+    name: "Zarifa Qurbanova",
+    email: "zarifa.private@realmail.test",
+    phone: "+44 20 7946 0958",
+    notes: "Gate code 4471, anniversary surprise",
+    subject: "Invoice for Qurbanova Ltd",
+    message: "Please call my husband Orkhan back today about the allergy.",
+  }
+  // every personal value written below, whole and in parts
+  const FORBIDDEN = [SECRET.name, "Zarifa", "Qurbanova", SECRET.email, "realmail", SECRET.phone, "7946 0958", SECRET.notes, "4471", "anniversary", SECRET.subject, "Invoice", SECRET.message, "Orkhan"]
+
+  async function visitorWrites() {
+    await request(app).post("/api/reservations").send({ name: SECRET.name, email: SECRET.email, phone: SECRET.phone, date: "2027-03-05", time: "19:00", partySize: 2, notes: SECRET.notes }).expect(201)
+    await request(app).post("/api/orders").send({ name: SECRET.name, phone: SECRET.phone, email: SECRET.email, pickupAt: "13:00", notes: SECRET.notes, items: [{ slug: "espresso", qty: 2 }] }).expect(201)
+    await request(app).post("/api/contact").send({ name: SECRET.name, email: SECRET.email, subject: SECRET.subject, message: SECRET.message }).expect(201)
+    await request(app).post("/api/newsletter").send({ email: SECRET.email }).expect(201)
+  }
+  async function demoAuth() {
+    await seedDemoAdmin({})
+    const r = await request(app).post("/api/auth/login").send(DEMO_ADMIN).expect(200)
+    return { Authorization: "Bearer " + r.body.token }
+  }
+
+  it("answers every admin GET with placeholders, whatever the query says", async () => {
+    await visitorWrites()
+    const demo = await demoAuth()
+    const paths = Object.keys(DEMO_VIEWS)
+    expect([...paths].sort()).toEqual(["/dishes", "/messages", "/orders", "/reservations", "/sections", "/subscribers"])
+    const probes = [
+      ...paths,
+      "/reservations?date=2027-03-05&status=confirmed",
+      "/reservations?q=Zarifa&search=Zarifa&name=Zarifa&sort=name&email=" + encodeURIComponent(SECRET.email),
+      "/orders?status=new&phone=" + encodeURIComponent(SECRET.phone) + "&sort=-name",
+      "/messages?limit=100&q=Orkhan&email[$regex]=^z",
+      "/subscribers?sort=email&q=zarifa",
+    ]
+    for (const p of probes) {
+      const res = await request(app).get("/api/admin" + p).set(demo)
+      expect(res.status, p).toBe(200)
+      const text = JSON.stringify(res.body).toLowerCase()
+      for (const value of FORBIDDEN) expect(text.includes(value.toLowerCase()), p + ' leaks "' + value + '"').toBe(false)
+    }
+
+    // rows are still listed, with fixed placeholders
+    const res = (await request(app).get("/api/admin/reservations").set(demo)).body
+    expect(res.total).toBe(1)
+    expect(res.items[0]).toMatchObject({ name: "Guest 1", email: "hidden-1@demo.invalid", phone: "00000 000000", notes: "Hidden in the public demo", date: "2027-03-05", time: "19:00", partySize: 2, status: "confirmed" })
+    const orders = (await request(app).get("/api/admin/orders").set(demo)).body
+    expect(orders.items[0]).toMatchObject({ name: "Guest 1", phone: "00000 000000", email: "hidden-1@demo.invalid", notes: "Hidden in the public demo", pickupAt: "13:00", status: "new" })
+    expect(orders.items[0].items[0]).toMatchObject({ slug: "espresso", qty: 2 })
+    const msgs = (await request(app).get("/api/admin/messages").set(demo)).body
+    expect(msgs.items[0]).toMatchObject({ name: "Visitor 1", email: "hidden-1@demo.invalid", subject: "Hidden in the public demo", message: "Hidden in the public demo", read: false })
+    expect((await request(app).get("/api/admin/subscribers").set(demo)).body.map((s: { email: string }) => s.email)).toEqual(["hidden-1@demo.invalid"])
+
+    // unknown query parameters change nothing for the demo role (no oracle)
+    const probe = await request(app).get("/api/admin/reservations?name=Nobody&q=nobody").set(demo).expect(200)
+    expect(probe.body).toEqual(res)
+
+    // an admin GET that is not listed in lib/demo.ts is refused for the demo role (deny by default)
+    await request(app).get("/api/admin/guests").set(demo).expect(403)
+    await request(app).get("/api/admin/guests").set(auth()).expect(404)
+  })
+
+  it("still shows a real admin the full data", async () => {
+    await visitorWrites()
+    await demoAuth()
+    const res = (await request(app).get("/api/admin/reservations").set(auth()).expect(200)).body.items[0]
+    expect(res).toMatchObject({ name: SECRET.name, email: SECRET.email, phone: SECRET.phone, notes: SECRET.notes })
+    const order = (await request(app).get("/api/admin/orders").set(auth()).expect(200)).body.items[0]
+    expect(order).toMatchObject({ name: SECRET.name, phone: SECRET.phone, email: SECRET.email, notes: SECRET.notes })
+    const msg = (await request(app).get("/api/admin/messages").set(auth()).expect(200)).body.items[0]
+    expect(msg).toMatchObject({ name: SECRET.name, email: SECRET.email, subject: SECRET.subject, message: SECRET.message })
+    expect((await request(app).get("/api/admin/subscribers").set(auth()).expect(200)).body[0].email).toBe(SECRET.email)
+    await request(app).patch("/api/admin/messages/" + msg._id).set(auth()).send({ read: true }).expect(200)
+  })
+})
+
+describe("DEMO_ADMIN=false kill switch", () => {
+  it("refuses the demo login and tokens issued earlier, and removes the account", async () => {
+    await seedDemoAdmin({})
+    const token = (await request(app).post("/api/auth/login").send(DEMO_ADMIN).expect(200)).body.token
+    const demo = { Authorization: "Bearer " + token }
+    await request(app).get("/api/admin/orders").set(demo).expect(200)
+
+    // Same database, server started with DEMO_ADMIN=false. Even before the account is removed:
+    const off = makeApp(testConfig({ DEMO_ADMIN: "false" }))
+    expect((await request(off).post("/api/auth/login").send(DEMO_ADMIN).expect(401)).body.error).toBe("Email or password is incorrect.")
+    for (const p of ["/api/auth/me", "/api/admin/sections", "/api/admin/dishes", "/api/admin/reservations", "/api/admin/orders", "/api/admin/messages", "/api/admin/subscribers"]) {
+      await request(off).get(p).set(demo).expect(401)
+    }
+    await request(off).post("/api/admin/dishes").set(demo).send({}).expect(401)
+    // the real admin is not affected
+    await request(off).get("/api/admin/orders").set(auth()).expect(200)
+    await request(off).post("/api/auth/login").send(ADMIN).expect(200)
+
+    // what server.ts and `npm run seed` do on start with the switch off
+    expect(await seedDemoAdmin({ DEMO_ADMIN: "false" })).toBeNull()
+    expect(await Admin.countDocuments({ role: "demo" })).toBe(0)
+    expect(await Admin.countDocuments({ email: DEMO_ADMIN.email })).toBe(0)
+    expect(await Admin.countDocuments({ email: ADMIN.email })).toBe(1)
+    // gone for good: also on an app where the demo is on, until it is seeded again
+    await request(app).post("/api/auth/login").send(DEMO_ADMIN).expect(401)
+    await request(app).get("/api/admin/orders").set(demo).expect(401)
+    await request(off).post("/api/auth/login").send(DEMO_ADMIN).expect(401)
+  })
+
+  it("is on unless DEMO_ADMIN is exactly false, and never deletes a real admin", async () => {
+    expect(testConfig().DEMO_ADMIN).toBe(true)
+    expect(testConfig({ DEMO_ADMIN: "true" }).DEMO_ADMIN).toBe(true)
+    expect(testConfig({ DEMO_ADMIN: "false" }).DEMO_ADMIN).toBe(false)
+    await Admin.create({ email: DEMO_ADMIN.email, passwordHash: "x", role: "admin" })
+    expect(await seedDemoAdmin({ DEMO_ADMIN: "false" })).toBeNull()
+    expect(await Admin.countDocuments({ email: DEMO_ADMIN.email, role: "admin" })).toBe(1)
   })
 })

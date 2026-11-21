@@ -13,6 +13,11 @@ const schema = z.object({
   RESTAURANT_TZ: z.string().default("Europe/London"),
   UPLOAD_DIR: z.string().default("uploads"),
   MAX_UPLOAD_MB: z.coerce.number().positive().max(10).default(3),
+  // Public read-only demo admin. DEMO_ADMIN=false is the kill switch: no demo login, demo tokens refused, account removed on start.
+  DEMO_ADMIN: z
+    .string()
+    .optional()
+    .transform((v) => v !== "false"),
 })
 
 export type Config = z.infer<typeof schema>

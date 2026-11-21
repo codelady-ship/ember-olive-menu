@@ -26,7 +26,7 @@ Form bodies accept a hidden `website` honeypot field that must stay empty.
 
 ## Admin (Bearer JWT from `/auth/login`)
 
-`/auth/login` answers `{ token, email, role }`. Role `demo` (the public demo admin seeded by `npm run seed`) may call every GET below; every other method answers 403 `Demo admin is read-only: changes are not saved.`
+`/auth/login` answers `{ token, email, role }`. Role `demo` (the public demo admin seeded by `npm run seed`) may call every GET below; every other method answers 403 `Demo admin is read-only: changes are not saved.` For this role the server replaces personal fields (name, email, phone, notes, subject, message) with fixed placeholders, ignores query parameters other than the documented ones, and answers 403 for any admin GET not listed in `backend/src/lib/demo.ts`. With `DEMO_ADMIN=false` the demo login and existing demo tokens answer 401 and the account is deleted on start.
 
 | Method | Path | Notes |
 |---|---|---|

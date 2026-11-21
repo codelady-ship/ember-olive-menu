@@ -1,8 +1,8 @@
 /**
  * Load the starter menu (shared/menu.json) into MongoDB and create the public
  * read-only demo admin (demo@ember-olive.demo / demo1234, role "demo").
- * Upserts, so it is safe to run again; it never deletes anything.
- *   npm run seed            (DEMO_ADMIN=false skips the demo admin)
+ * Upserts, so it is safe to run again; it never deletes menu data.
+ *   npm run seed            (DEMO_ADMIN=false removes the demo admin instead)
  */
 import bcrypt from "bcryptjs"
 import fs from "node:fs"
@@ -33,8 +33,15 @@ export async function seedMenu(file = MENU_FILE) {
 /** Public by design: shown on the sign-in page. Its role can read everything and write nothing. */
 export const DEMO_ADMIN = { email: "demo@ember-olive.demo", password: "demo1234" }
 
+/**
+ * Creates or refreshes the demo admin. With DEMO_ADMIN=false it removes every account whose role is
+ * "demo" (never a real admin) and returns null; login and token checks refuse the role as well.
+ */
 export async function seedDemoAdmin(env: NodeJS.ProcessEnv = process.env) {
-  if (env.DEMO_ADMIN === "false") return null
+  if (env.DEMO_ADMIN === "false") {
+    await Admin.deleteMany({ role: "demo" })
+    return null
+  }
   const existing = await Admin.findOne({ email: DEMO_ADMIN.email }).select("role").lean()
   if (existing && existing.role !== "demo") return null // never downgrade a real admin
   const passwordHash = await bcrypt.hash(DEMO_ADMIN.password, 10)
@@ -52,6 +59,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const n = await seedMenu()
   console.log("Seeded " + n.sections + " sections and " + n.dishes + " dishes.")
   const demo = await seedDemoAdmin()
-  console.log(demo ? "Demo admin ready: " + demo + " (read-only)." : "Demo admin skipped.")
+  console.log(demo ? "Demo admin ready: " + demo + " (read-only)." : process.env.DEMO_ADMIN === "false" ? "Demo admin is off (DEMO_ADMIN=false): account removed." : "Demo admin skipped.")
   await mongoose.disconnect()
 }

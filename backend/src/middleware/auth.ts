@@ -14,7 +14,10 @@ export function signAdmin(cfg: Config, id: string, role: AdminRole = "admin"): s
   return jwt.sign({ role }, cfg.JWT_SECRET, { subject: id, algorithm: "HS256", expiresIn: cfg.JWT_EXPIRES_IN as jwt.SignOptions["expiresIn"] })
 }
 
-/** Bearer token required; the admin must still exist. The demo role may only read. */
+/**
+ * Bearer token required; the admin must still exist. The demo role may only read, what it reads is
+ * filtered by demoAdminView (lib/demo.ts), and with DEMO_ADMIN=false its tokens are refused outright.
+ */
 export function requireAdmin(cfg: Config) {
   return async (req: Request, _res: Response, next: NextFunction) => {
     try {
@@ -32,6 +35,7 @@ export function requireAdmin(cfg: Config) {
       if (!admin) throw new HttpError(401, "Please sign in.")
       // The role comes from the database, so a token can never grant more than the account has.
       const role: AdminRole = admin.role === "demo" ? "demo" : "admin"
+      if (role === "demo" && !cfg.DEMO_ADMIN) throw new HttpError(401, "Please sign in.")
       if (role === "demo" && !READ_METHODS.has(req.method)) throw new HttpError(403, DEMO_READ_ONLY)
       locals(req).admin = { id: String(admin._id), email: admin.email, role }
       next()
