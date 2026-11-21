@@ -22,6 +22,8 @@ const adminSchema = new Schema(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
+    // "demo" = the public read-only demo admin: can open every admin page, every write answers 403.
+    role: { type: String, enum: ["admin", "demo"], default: "admin" },
   },
   { timestamps: true },
 )

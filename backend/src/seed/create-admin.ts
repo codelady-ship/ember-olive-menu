@@ -23,6 +23,6 @@ if (!env.success) {
 
 await mongoose.connect(env.data.MONGODB_URI)
 const passwordHash = await bcrypt.hash(env.data.ADMIN_PASSWORD, 12)
-await Admin.updateOne({ email: env.data.ADMIN_EMAIL }, { $set: { passwordHash } }, { upsert: true })
+await Admin.updateOne({ email: env.data.ADMIN_EMAIL }, { $set: { passwordHash, role: "admin" } }, { upsert: true })
 console.log("Admin account ready.")
 await mongoose.disconnect()

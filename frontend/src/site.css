@@ -158,11 +158,23 @@ textarea.input{min-height:120px;resize:vertical}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:18px 0 24px;border-bottom:1px solid var(--line)}
 .tabs button{appearance:none;border:0;background:none;color:var(--chrome-muted);font:inherit;font-size:15px;letter-spacing:.12em;text-transform:uppercase;min-height:44px;padding:0 14px;cursor:pointer;border-bottom:2px solid transparent}
 .tabs button[aria-selected="true"]{color:var(--chrome);border-color:var(--gold)}
-.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
-table.data{width:100%;border-collapse:collapse;font-size:15px}
+.table-wrap{position:relative;overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table.data{width:100%;min-width:720px;border-collapse:collapse;font-size:15px}
 table.data th,table.data td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
 table.data th{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--chrome-muted)}
 .checks{display:flex;flex-wrap:wrap;gap:6px 14px}
 .checks label{display:inline-flex;align-items:center;gap:6px;min-height:44px;font-size:15px;text-transform:none;letter-spacing:0;color:var(--chrome)}
 .checks input{width:20px;height:20px}
-.thumb{width:72px;height:72px;object-fit:contain;background:#f2e7cd;border-radius:6px}
+.thumb{width:72px;height:72px;max-width:none;object-fit:contain;background:#f2e7cd;border-radius:6px}
+.demo-note{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin:16px 0;border-color:rgba(201,162,74,.5)}
+.demo-note p{margin:0;flex:1 1 260px}
+.demo-note .demo-hint{flex-basis:100%;font-size:14px;color:var(--chrome-muted)}
+table.data select.input{min-width:150px}
+.admin-toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:50;max-width:calc(100% - 32px);padding:12px 18px;border-radius:8px;background:var(--gold-hi);color:#140e08;font-size:15px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.admin-toast[hidden]{display:none}
+.confirm-pair{display:inline-flex;align-items:center;gap:8px}
+.confirm-pair .btn{min-width:44px;white-space:nowrap}
+.btn.danger{border-color:#c0492b;background:#a83c16;color:#fff}
+.btn.danger:hover:not(:disabled){background:#c0492b;color:#fff}
+.row.nowrap{flex-wrap:nowrap}
+.demo-note .demo-err{flex-basis:100%}

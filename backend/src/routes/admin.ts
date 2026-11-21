@@ -4,6 +4,7 @@ import type { Config } from "../config.js"
 import { releaseSeats, takeSeats } from "../lib/booking.js"
 import { HttpError, ah, parse } from "../lib/http.js"
 import { dishInput, idParam, sectionInput } from "../lib/schemas.js"
+import { demoAdminView } from "../lib/demo.js"
 import { imageUpload, saveImage } from "../lib/upload.js"
 import { requireAdmin } from "../middleware/auth.js"
 import { Dish } from "../models/Dish.js"
@@ -20,6 +21,8 @@ const page = z.object({
 export function adminRoutes(cfg: Config) {
   const r = Router()
   r.use(requireAdmin(cfg))
+  // Demo role: deny-by-default, personal data replaced by placeholders, query parameters allow-listed (lib/demo.ts).
+  r.use(demoAdminView)
 
   // ---- sections
   r.get(

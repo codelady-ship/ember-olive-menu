@@ -67,10 +67,25 @@ npm run dev                 # http://localhost:5173/
 The staff area lives at `http://localhost:5173/#/admin`. On localhost only, you
 can also point the site at another local API with `?api=http://localhost:4001`.
 
+**Demo admin.** The sign-in page has a **Demo admin** button. With the API up it
+signs in as `demo@ember-olive.demo` / `demo1234` (public on purpose), a `demo`
+role created by `npm run seed` and on every server start: it opens every admin
+page, but every write answers 403 "Demo admin is read-only" (shown as a toast).
+It never sees guest data: names, emails, phones, notes, subjects and message
+text are replaced on the server by fixed placeholders
+(`backend/src/lib/demo.ts`, deny-by-default: an admin GET that is not listed
+there answers 403 for this role, and only listed query parameters are passed
+on). `DEMO_ADMIN=false` turns it off: the demo login is refused, demo tokens
+issued earlier are rejected at once, and the account is deleted on the next
+start or `npm run seed`. When the API is not set or not
+reachable, the button opens an in-browser sandbox built from `shared/menu.json`
+with sample bookings and orders; changes stay in that tab (sessionStorage) and
+**Reset demo data** starts over.
+
 ## Tests
 
 ```bash
-cd backend && npm test      # 27 tests: menu, orders priced on the server, auth, admin CRUD,
+cd backend && npm test      # 32 tests: menu, orders priced on the server, auth, admin CRUD,
                             # uploads, and 12 parallel bookings for a 10-seat slot (exactly 5 win)
 cd frontend && npm test     # 11 tests: menu mapping, demo fallback, API base rules, JSON-LD, page building
 ```
