@@ -81,6 +81,8 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
   const coverRef = React.useRef<HTMLDivElement | null>(null)
   const baseRef = React.useRef<HTMLDivElement | null>(null)
   const figures = React.useRef(new Map<number, { host: HTMLDivElement | null; box: HTMLDivElement | null }>())
+  /** Dish photo pages whose photo may load: the first one, and each one once the book comes near it. */
+  const photoNear = React.useRef(new Set<number>())
   const engineRef = React.useRef<RiseEngine | null>(null)
   const enginePromise = React.useRef<Promise<RiseEngine | null> | null>(null)
   const s = React.useRef({ u: 0, target: 0, t: 0, c: 0, opened: false, idx: -1, seen: new Set<number>(), risen: -1, settleK: -1, settleAt: 0, visible: true, pend: { to: 0, at: -1e9 } })
@@ -374,8 +376,9 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
           riseAt(photo)
         }
       } else st.settleK = -1
-      // warm up three.js when a featured spread is one turn away
-      if (mode === "3d" && !enginePromise.current && (photoPageAt(k) >= 0 || photoPageAt(k + 1) >= 0)) getEngine()
+      // warm up three.js when a featured spread is one turn away, but not before the reader starts turning:
+      // on the opening spread it used to load with the page even when nobody turned a page
+      if (mode === "3d" && !enginePromise.current && st.u > 0.04 && (photoPageAt(k) >= 0 || photoPageAt(k + 1) >= 0)) getEngine()
     }
     const io = new IntersectionObserver(([en]) => (st.visible = en.isIntersecting))
     if (stageRef.current) io.observe(stageRef.current)
@@ -654,6 +657,10 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
       case "dish-photo": {
         const d = page.dish
         const glass = kindOf(d) === "glass"
+        // Only the first dish photo loads with the page; the others (about 150 KB each) start loading when the
+        // book is one spread (phones: two pages) away, so they are ready before their page opens.
+        if (page.n === 0 || Math.abs((single ? p : p >> 1) - idx) <= (single ? 2 : 1)) photoNear.current.add(p)
+        const src = photoNear.current.has(p) ? mediaUrl(d.image) : undefined
         return (
           <div className="eo-in eo-dish-page">
             <div className={"eo-figure" + (glass ? " glass" : "") + (lifted === p ? " lifted" : "")} data-slug={d.slug}>
@@ -666,7 +673,7 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
                   figures.current.set(p, f)
                 }}
               >
-                <img src={mediaUrl(d.image)} alt={d.alt || d.name} width={1024} height={1024} loading={page.n === 0 ? "eager" : "lazy"} fetchPriority={page.n === 0 ? "high" : "auto"} decoding="async" draggable={false} onLoad={(e) => e.currentTarget.classList.add("on")} />
+                <img src={src} alt={d.alt || d.name} width={1024} height={1024} loading={page.n === 0 ? "eager" : "lazy"} fetchPriority={page.n === 0 ? "high" : "auto"} decoding="async" draggable={false} onLoad={(e) => e.currentTarget.classList.add("on")} />
                 {d.video && lifted === p && mode !== "none" && (
                   <video className="eo-clip" src={mediaUrl(d.video)} poster={mediaUrl(d.image)} muted loop playsInline autoPlay aria-hidden="true" onError={(e) => e.currentTarget.remove()} />
                 )}
