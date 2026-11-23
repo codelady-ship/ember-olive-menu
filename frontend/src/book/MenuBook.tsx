@@ -83,9 +83,12 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
   const figures = React.useRef(new Map<number, { host: HTMLDivElement | null; box: HTMLDivElement | null }>())
   /** Dish photo pages whose photo may load: the first one, and each one once the book comes near it. */
   const photoNear = React.useRef(new Set<number>())
+  /** One download per photo page, shared by the page's <img> (same URL, so it comes from the cache). */
+  const photoLoads = React.useRef(new Map<number, Promise<void>>())
+  const [, photoTick] = React.useReducer((x: number) => x + 1, 0)
   const engineRef = React.useRef<RiseEngine | null>(null)
   const enginePromise = React.useRef<Promise<RiseEngine | null> | null>(null)
-  const s = React.useRef({ u: 0, target: 0, t: 0, c: 0, opened: false, idx: -1, seen: new Set<number>(), risen: -1, settleK: -1, settleAt: 0, visible: true, pend: { to: 0, at: -1e9 } })
+  const s = React.useRef({ u: 0, target: 0, t: 0, c: 0, opened: false, idx: -1, seen: new Set<number>(), warmAll: false, risen: -1, settleK: -1, settleAt: 0, visible: true, pend: { to: 0, at: -1e9 } })
 
   const [single, setSingle] = React.useState(false)
   const [size, setSize] = React.useState({ w: 0, h: 0, x: 0, y: 0 })
@@ -111,6 +114,50 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
     (k: number) => {
       const p = single ? k : k * 2 + 1
       return pages[p]?.kind === "dish-photo" ? p : -1
+    },
+    [pages, single],
+  )
+
+  /** Mark dish photo pages as near and start their downloads; resolves when they have loaded (or failed). */
+  const warmPhotos = React.useCallback(
+    (ps: number[]) => {
+      let added = false
+      const loads = ps.map((p) => {
+        const page = pages[p]
+        if (page?.kind !== "dish-photo") return Promise.resolve()
+        if (!photoNear.current.has(p)) {
+          photoNear.current.add(p)
+          added = true
+        }
+        let load = photoLoads.current.get(p)
+        if (!load) {
+          const src = mediaUrl(page.dish.image)
+          load = src
+            ? new Promise<void>((done) => {
+                const im = new Image()
+                im.decoding = "async"
+                im.onload = im.onerror = () => done()
+                im.src = src
+              })
+            : Promise.resolve()
+          photoLoads.current.set(p, load)
+        }
+        return load
+      })
+      if (added) photoTick()
+      return Promise.all(loads).then(() => {})
+    },
+    [pages],
+  )
+  /** Dish photo pages on leaves a..b (either order), plus pad leaves on each side. */
+  const photosAround = React.useCallback(
+    (a: number, b: number, pad: number) => {
+      const lo = Math.min(a, b) - pad
+      const hi = Math.max(a, b) + pad
+      return pages.flatMap((pg, p) => {
+        const leaf = single ? p : p >> 1
+        return pg.kind === "dish-photo" && leaf >= lo && leaf <= hi ? [p] : []
+      })
     },
     [pages, single],
   )
@@ -379,6 +426,14 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
       // warm up three.js when a featured spread is one turn away, but not before the reader starts turning:
       // on the opening spread it used to load with the page even when nobody turned a page
       if (mode === "3d" && !enginePromise.current && st.u > 0.04 && (photoPageAt(k) >= 0 || photoPageAt(k + 1) >= 0)) getEngine()
+      // once the reader is turning, fetch the remaining dish photos when the browser is idle
+      if (!st.warmAll && st.u > 0.04) {
+        st.warmAll = true
+        const all = () => void warmPhotos(photosAround(0, pages.length, 0))
+        const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }
+        if (w.requestIdleCallback) w.requestIdleCallback(all, { timeout: 3000 })
+        else window.setTimeout(all, 1500)
+      }
     }
     const io = new IntersectionObserver(([en]) => (st.visible = en.isIntersecting))
     if (stageRef.current) io.observe(stageRef.current)
@@ -391,7 +446,7 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
       window.removeEventListener("scroll", onScroll)
       window.removeEventListener("resize", onScroll)
     }
-  }, [size.w > 0, apply, progress, targetOf, photoPageAt, riseAt, lowerNow, getEngine, mode, reduced])
+  }, [size.w > 0, apply, progress, targetOf, photoPageAt, riseAt, lowerNow, getEngine, mode, reduced, warmPhotos, photosAround, pages.length])
 
   // ---- the cover opens
   React.useEffect(() => {
@@ -428,15 +483,21 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
       const target = clamp(i, 0, turns)
       const st = s.current
       st.pend = { to: target, at: performance.now() }
-      if (st.risen >= 0) {
-        const lowering = lowerNow()
-        await Promise.race([lowering, wait(650)])
-      }
+      // A jump (contents, tabs, arrows) can cross several spreads. Fetch the photos that will be seen (the target
+      // spread's, and with motion also those of the spreads it passes) and give them a moment to arrive (capped), so
+      // no photo page opens or passes by empty; the target's neighbours follow after them, so they do not share the
+      // bandwidth. Cached photos resolve at once.
+      const from = clamp(Math.round(st.u), 0, turns)
+      const seen = warmPhotos(reduced ? photosAround(target, target, 0) : photosAround(from, target, 0))
+      void seen.then(() => warmPhotos(photosAround(target, target, single ? 2 : 1)))
+      const settle: Promise<unknown>[] = [Promise.race([seen, wait(2500)])]
+      if (st.risen >= 0) settle.push(Promise.race([lowerNow(), wait(650)]))
+      await Promise.all(settle)
       const top = sc.getBoundingClientRect().top + window.scrollY
       const total = sc.offsetHeight - stage.offsetHeight
       window.scrollTo({ top: Math.round(top + (total * target) / turns), behavior: reduced ? "auto" : "smooth" })
     },
-    [turns, reduced, lowerNow],
+    [turns, reduced, lowerNow, single, warmPhotos, photosAround],
   )
 
   // ---- keys, swipe, pointer
