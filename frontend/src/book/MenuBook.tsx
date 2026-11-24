@@ -81,9 +81,13 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
   const coverRef = React.useRef<HTMLDivElement | null>(null)
   const baseRef = React.useRef<HTMLDivElement | null>(null)
   const figures = React.useRef(new Map<number, { host: HTMLDivElement | null; box: HTMLDivElement | null }>())
+  /** Dish photo pages whose photo may load: the first one, and each one once the book comes near it. */
+  const photoNear = React.useRef(new Set<number>())
+  /** One download per photo page, shared by the page's <img> (same URL, so it comes from the cache). */
+  const photoLoads = React.useRef(new Map<number, Promise<void>>())
   const engineRef = React.useRef<RiseEngine | null>(null)
   const enginePromise = React.useRef<Promise<RiseEngine | null> | null>(null)
-  const s = React.useRef({ u: 0, target: 0, t: 0, c: 0, opened: false, idx: -1, seen: new Set<number>(), risen: -1, settleK: -1, settleAt: 0, visible: true, pend: { to: 0, at: -1e9 } })
+  const s = React.useRef({ u: 0, target: 0, t: 0, c: 0, opened: false, idx: -1, seen: new Set<number>(), warmAll: false, risen: -1, settleK: -1, settleAt: 0, visible: true, pend: { to: 0, at: -1e9 } })
 
   const [single, setSingle] = React.useState(false)
   const [size, setSize] = React.useState({ w: 0, h: 0, x: 0, y: 0 })
@@ -109,6 +113,51 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
     (k: number) => {
       const p = single ? k : k * 2 + 1
       return pages[p]?.kind === "dish-photo" ? p : -1
+    },
+    [pages, single],
+  )
+
+  /** Mark dish photo pages as near and start their downloads; resolves when they have loaded (or failed). */
+  const warmPhotos = React.useCallback(
+    (ps: number[]) => {
+      const loads = ps.map((p) => {
+        const page = pages[p]
+        if (page?.kind !== "dish-photo") return Promise.resolve()
+        if (!photoNear.current.has(p)) {
+          photoNear.current.add(p)
+          // give the page's <img> its src directly (no re-render of the book); the next render sets the same src
+          const img = figures.current.get(p)?.box?.querySelector("img")
+          const url = mediaUrl(page.dish.image)
+          if (img && url && !img.getAttribute("src")) img.src = url
+        }
+        let load = photoLoads.current.get(p)
+        if (!load) {
+          const src = mediaUrl(page.dish.image)
+          load = src
+            ? new Promise<void>((done) => {
+                const im = new Image()
+                im.decoding = "async"
+                im.onload = im.onerror = () => done()
+                im.src = src
+              })
+            : Promise.resolve()
+          photoLoads.current.set(p, load)
+        }
+        return load
+      })
+      return Promise.all(loads).then(() => {})
+    },
+    [pages],
+  )
+  /** Dish photo pages on leaves a..b (either order), plus pad leaves on each side. */
+  const photosAround = React.useCallback(
+    (a: number, b: number, pad: number) => {
+      const lo = Math.min(a, b) - pad
+      const hi = Math.max(a, b) + pad
+      return pages.flatMap((pg, p) => {
+        const leaf = single ? p : p >> 1
+        return pg.kind === "dish-photo" && leaf >= lo && leaf <= hi ? [p] : []
+      })
     },
     [pages, single],
   )
@@ -374,8 +423,9 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
           riseAt(photo)
         }
       } else st.settleK = -1
-      // warm up three.js when a featured spread is one turn away
-      if (mode === "3d" && !enginePromise.current && (photoPageAt(k) >= 0 || photoPageAt(k + 1) >= 0)) getEngine()
+      // warm up three.js when a featured spread is one turn away, but not before the reader starts turning:
+      // on the opening spread it used to load with the page even when nobody turned a page
+      if (mode === "3d" && !enginePromise.current && st.u > 0.04 && (photoPageAt(k) >= 0 || photoPageAt(k + 1) >= 0)) getEngine()
     }
     const io = new IntersectionObserver(([en]) => (st.visible = en.isIntersecting))
     if (stageRef.current) io.observe(stageRef.current)
@@ -425,6 +475,7 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
       const target = clamp(i, 0, turns)
       const st = s.current
       st.pend = { to: target, at: performance.now() }
+      const from = clamp(Math.round(st.u), 0, turns)
       if (st.risen >= 0) {
         const lowering = lowerNow()
         await Promise.race([lowering, wait(650)])
@@ -432,9 +483,47 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
       const top = sc.getBoundingClientRect().top + window.scrollY
       const total = sc.offsetHeight - stage.offsetHeight
       window.scrollTo({ top: Math.round(top + (total * target) / turns), behavior: reduced ? "auto" : "smooth" })
+      // A jump (contents, tabs, arrows) can cross several spreads: start the photos it will show (target spread
+      // first, then the spreads it passes and the target's neighbours) without delaying the jump. Usually they are
+      // already here (see warmAll); a photo still on its way fades in as usual.
+      void warmPhotos(photosAround(target, target, 0))
+      void warmPhotos(photosAround(from, target, single ? 2 : 1))
     },
-    [turns, reduced, lowerNow],
+    [turns, reduced, lowerNow, single, warmPhotos, photosAround],
   )
+
+  /** Fetch every dish photo (once). */
+  const warmAll = React.useCallback(() => {
+    const st = s.current
+    if (st.warmAll) return
+    st.warmAll = true
+    void warmPhotos(photosAround(0, pages.length, 0))
+  }, [warmPhotos, photosAround, pages.length])
+  // The first dish photo loads with the page; the others follow shortly after the page has loaded and the browser
+  // is idle, or at once on the visitor's first pointer, key, wheel, touch or scroll (and on hovering or focusing
+  // the book's contents, tabs and arrows, see the root below), so they are in before any jump can show them.
+  React.useEffect(() => {
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (h: number) => void }
+    const evs = ["pointerdown", "keydown", "wheel", "touchstart", "scroll"] as const
+    const go = () => warmAll()
+    let timer = 0
+    let idle = 0
+    const later = () => {
+      timer = window.setTimeout(() => {
+        if (w.requestIdleCallback) idle = w.requestIdleCallback(go, { timeout: 2000 })
+        else go()
+      }, 1500)
+    }
+    if (document.readyState === "complete") later()
+    else window.addEventListener("load", later, { once: true })
+    evs.forEach((e) => window.addEventListener(e, go, { once: true, passive: true }))
+    return () => {
+      window.removeEventListener("load", later)
+      window.clearTimeout(timer)
+      if (idle && w.cancelIdleCallback) w.cancelIdleCallback(idle)
+      evs.forEach((e) => window.removeEventListener(e, go))
+    }
+  }, [warmAll])
 
   // ---- keys, swipe, pointer
   React.useEffect(() => {
@@ -654,6 +743,10 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
       case "dish-photo": {
         const d = page.dish
         const glass = kindOf(d) === "glass"
+        // Only the first dish photo loads with the page; the others (about 150 KB each) start loading when the
+        // book is one spread (phones: two pages) away, so they are ready before their page opens.
+        if (page.n === 0 || Math.abs((single ? p : p >> 1) - idx) <= (single ? 2 : 1)) photoNear.current.add(p)
+        const src = photoNear.current.has(p) ? mediaUrl(d.image) : undefined
         return (
           <div className="eo-in eo-dish-page">
             <div className={"eo-figure" + (glass ? " glass" : "") + (lifted === p ? " lifted" : "")} data-slug={d.slug}>
@@ -666,7 +759,7 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
                   figures.current.set(p, f)
                 }}
               >
-                <img src={mediaUrl(d.image)} alt={d.alt || d.name} width={1024} height={1024} loading={page.n === 0 ? "eager" : "lazy"} fetchPriority={page.n === 0 ? "high" : "auto"} decoding="async" draggable={false} onLoad={(e) => e.currentTarget.classList.add("on")} />
+                <img src={src} alt={d.alt || d.name} width={1024} height={1024} loading={page.n === 0 ? "eager" : "lazy"} fetchPriority={page.n === 0 ? "high" : "auto"} decoding="async" draggable={false} onLoad={(e) => e.currentTarget.classList.add("on")} />
                 {d.video && lifted === p && mode !== "none" && (
                   <video className="eo-clip" src={mediaUrl(d.video)} poster={mediaUrl(d.image)} muted loop playsInline autoPlay aria-hidden="true" onError={(e) => e.currentTarget.remove()} />
                 )}
@@ -908,7 +1001,7 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
   } as React.CSSProperties
 
   return (
-    <div ref={rootRef} className={"eo-book-root" + (single ? " eo-single" : "")} style={vars}>
+    <div ref={rootRef} className={"eo-book-root" + (single ? " eo-single" : "")} style={vars} onPointerOver={warmAll} onFocus={warmAll}>
       <div ref={scrollerRef} className="eo-scroller" style={{ height: "calc(100svh * " + (1 + turns * segVh).toFixed(2) + ")" }}>
         <section ref={stageRef} className="eo-stage" aria-roledescription="menu book" aria-label={SITE.name + " menu book"}>
           <header className="eo-bar eo-top">

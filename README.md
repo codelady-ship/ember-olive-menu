@@ -14,6 +14,16 @@ small staff area at `#/admin`.
 
 **Live site:** https://codelady-ship.github.io/ember-olive-menu/ (after GitHub Pages is enabled)
 
+## Screenshots
+
+| The closed book | A signature dish rises (desktop) |
+|---|---|
+| ![The black leather menu book, closed, on a walnut table](docs/screenshots/desktop-1-cover-closed.webp) | ![An open spread: Truffle Tagliatelle text on the left, its photograph risen in 3D on the right](docs/screenshots/desktop-4-dish-risen.webp) |
+| **The full menu list** | **Phone: one page at a time** |
+| ![The plain menu list below the book, sections in two columns](docs/screenshots/desktop-10-full-menu.webp) | <img src="docs/screenshots/phone-4-dish-risen.webp" alt="The book on a phone, showing the Truffle Tagliatelle photo page" width="260"> |
+
+More, including the 3D viewer and the staff area, are in [docs/screenshots](docs/screenshots).
+
 ## Stack
 
 | Part | Tech |
