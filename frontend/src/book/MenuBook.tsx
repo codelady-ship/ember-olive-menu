@@ -85,7 +85,6 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
   const photoNear = React.useRef(new Set<number>())
   /** One download per photo page, shared by the page's <img> (same URL, so it comes from the cache). */
   const photoLoads = React.useRef(new Map<number, Promise<void>>())
-  const [, photoTick] = React.useReducer((x: number) => x + 1, 0)
   const engineRef = React.useRef<RiseEngine | null>(null)
   const enginePromise = React.useRef<Promise<RiseEngine | null> | null>(null)
   const s = React.useRef({ u: 0, target: 0, t: 0, c: 0, opened: false, idx: -1, seen: new Set<number>(), warmAll: false, risen: -1, settleK: -1, settleAt: 0, visible: true, pend: { to: 0, at: -1e9 } })
@@ -121,13 +120,15 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
   /** Mark dish photo pages as near and start their downloads; resolves when they have loaded (or failed). */
   const warmPhotos = React.useCallback(
     (ps: number[]) => {
-      let added = false
       const loads = ps.map((p) => {
         const page = pages[p]
         if (page?.kind !== "dish-photo") return Promise.resolve()
         if (!photoNear.current.has(p)) {
           photoNear.current.add(p)
-          added = true
+          // give the page's <img> its src directly (no re-render of the book); the next render sets the same src
+          const img = figures.current.get(p)?.box?.querySelector("img")
+          const url = mediaUrl(page.dish.image)
+          if (img && url && !img.getAttribute("src")) img.src = url
         }
         let load = photoLoads.current.get(p)
         if (!load) {
@@ -144,7 +145,6 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
         }
         return load
       })
-      if (added) photoTick()
       return Promise.all(loads).then(() => {})
     },
     [pages],
@@ -475,12 +475,7 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
       const target = clamp(i, 0, turns)
       const st = s.current
       st.pend = { to: target, at: performance.now() }
-      // A jump (contents, tabs, arrows) can cross several spreads: start the photos it will show (target spread
-      // first, then the spreads it passes and the target's neighbours) without waiting for them. Usually they are
-      // already here (see warmAll); a photo still on its way fades in as usual.
       const from = clamp(Math.round(st.u), 0, turns)
-      void warmPhotos(photosAround(target, target, 0))
-      void warmPhotos(photosAround(from, target, single ? 2 : 1))
       if (st.risen >= 0) {
         const lowering = lowerNow()
         await Promise.race([lowering, wait(650)])
@@ -488,6 +483,11 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
       const top = sc.getBoundingClientRect().top + window.scrollY
       const total = sc.offsetHeight - stage.offsetHeight
       window.scrollTo({ top: Math.round(top + (total * target) / turns), behavior: reduced ? "auto" : "smooth" })
+      // A jump (contents, tabs, arrows) can cross several spreads: start the photos it will show (target spread
+      // first, then the spreads it passes and the target's neighbours) without delaying the jump. Usually they are
+      // already here (see warmAll); a photo still on its way fades in as usual.
+      void warmPhotos(photosAround(target, target, 0))
+      void warmPhotos(photosAround(from, target, single ? 2 : 1))
     },
     [turns, reduced, lowerNow, single, warmPhotos, photosAround],
   )
