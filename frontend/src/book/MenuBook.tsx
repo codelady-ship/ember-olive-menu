@@ -426,14 +426,6 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
       // warm up three.js when a featured spread is one turn away, but not before the reader starts turning:
       // on the opening spread it used to load with the page even when nobody turned a page
       if (mode === "3d" && !enginePromise.current && st.u > 0.04 && (photoPageAt(k) >= 0 || photoPageAt(k + 1) >= 0)) getEngine()
-      // once the reader is turning, fetch the remaining dish photos when the browser is idle
-      if (!st.warmAll && st.u > 0.04) {
-        st.warmAll = true
-        const all = () => void warmPhotos(photosAround(0, pages.length, 0))
-        const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }
-        if (w.requestIdleCallback) w.requestIdleCallback(all, { timeout: 3000 })
-        else window.setTimeout(all, 1500)
-      }
     }
     const io = new IntersectionObserver(([en]) => (st.visible = en.isIntersecting))
     if (stageRef.current) io.observe(stageRef.current)
@@ -446,7 +438,7 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
       window.removeEventListener("scroll", onScroll)
       window.removeEventListener("resize", onScroll)
     }
-  }, [size.w > 0, apply, progress, targetOf, photoPageAt, riseAt, lowerNow, getEngine, mode, reduced, warmPhotos, photosAround, pages.length])
+  }, [size.w > 0, apply, progress, targetOf, photoPageAt, riseAt, lowerNow, getEngine, mode, reduced])
 
   // ---- the cover opens
   React.useEffect(() => {
@@ -483,22 +475,55 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
       const target = clamp(i, 0, turns)
       const st = s.current
       st.pend = { to: target, at: performance.now() }
-      // A jump (contents, tabs, arrows) can cross several spreads. Fetch the photos that will be seen (the target
-      // spread's, and with motion also those of the spreads it passes) and give them a moment to arrive (capped), so
-      // no photo page opens or passes by empty; the target's neighbours follow after them, so they do not share the
-      // bandwidth. Cached photos resolve at once.
+      // A jump (contents, tabs, arrows) can cross several spreads: start the photos it will show (target spread
+      // first, then the spreads it passes and the target's neighbours) without waiting for them. Usually they are
+      // already here (see warmAll); a photo still on its way fades in as usual.
       const from = clamp(Math.round(st.u), 0, turns)
-      const seen = warmPhotos(reduced ? photosAround(target, target, 0) : photosAround(from, target, 0))
-      void seen.then(() => warmPhotos(photosAround(target, target, single ? 2 : 1)))
-      const settle: Promise<unknown>[] = [Promise.race([seen, wait(2500)])]
-      if (st.risen >= 0) settle.push(Promise.race([lowerNow(), wait(650)]))
-      await Promise.all(settle)
+      void warmPhotos(photosAround(target, target, 0))
+      void warmPhotos(photosAround(from, target, single ? 2 : 1))
+      if (st.risen >= 0) {
+        const lowering = lowerNow()
+        await Promise.race([lowering, wait(650)])
+      }
       const top = sc.getBoundingClientRect().top + window.scrollY
       const total = sc.offsetHeight - stage.offsetHeight
       window.scrollTo({ top: Math.round(top + (total * target) / turns), behavior: reduced ? "auto" : "smooth" })
     },
     [turns, reduced, lowerNow, single, warmPhotos, photosAround],
   )
+
+  /** Fetch every dish photo (once). */
+  const warmAll = React.useCallback(() => {
+    const st = s.current
+    if (st.warmAll) return
+    st.warmAll = true
+    void warmPhotos(photosAround(0, pages.length, 0))
+  }, [warmPhotos, photosAround, pages.length])
+  // The first dish photo loads with the page; the others follow shortly after the page has loaded and the browser
+  // is idle, or at once on the visitor's first pointer, key, wheel, touch or scroll (and on hovering or focusing
+  // the book's contents, tabs and arrows, see the root below), so they are in before any jump can show them.
+  React.useEffect(() => {
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (h: number) => void }
+    const evs = ["pointerdown", "keydown", "wheel", "touchstart", "scroll"] as const
+    const go = () => warmAll()
+    let timer = 0
+    let idle = 0
+    const later = () => {
+      timer = window.setTimeout(() => {
+        if (w.requestIdleCallback) idle = w.requestIdleCallback(go, { timeout: 2000 })
+        else go()
+      }, 1500)
+    }
+    if (document.readyState === "complete") later()
+    else window.addEventListener("load", later, { once: true })
+    evs.forEach((e) => window.addEventListener(e, go, { once: true, passive: true }))
+    return () => {
+      window.removeEventListener("load", later)
+      window.clearTimeout(timer)
+      if (idle && w.cancelIdleCallback) w.cancelIdleCallback(idle)
+      evs.forEach((e) => window.removeEventListener(e, go))
+    }
+  }, [warmAll])
 
   // ---- keys, swipe, pointer
   React.useEffect(() => {
@@ -976,7 +1001,7 @@ export default function MenuBook({ menu, onAdd, onView3D, onSubscribe, fx = "aut
   } as React.CSSProperties
 
   return (
-    <div ref={rootRef} className={"eo-book-root" + (single ? " eo-single" : "")} style={vars}>
+    <div ref={rootRef} className={"eo-book-root" + (single ? " eo-single" : "")} style={vars} onPointerOver={warmAll} onFocus={warmAll}>
       <div ref={scrollerRef} className="eo-scroller" style={{ height: "calc(100svh * " + (1 + turns * segVh).toFixed(2) + ")" }}>
         <section ref={stageRef} className="eo-stage" aria-roledescription="menu book" aria-label={SITE.name + " menu book"}>
           <header className="eo-bar eo-top">
